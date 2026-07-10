@@ -48,6 +48,10 @@ for ax = 1:3
         'v_{gust} [m/s]');
 end
 
+%% a_com vs time (single figure: all missiles, all axes, in g)
+X = stack_cell_all_axes(results.a_com_ts, n_max) ./ 9.8;
+plot_time_stats(t_grid, X, 'a_{com} - All Missiles and Axes Combined', 'a_{com} [g]', false, results.A_max);
+
 %% R_hit histogram
 plot_R_hit_hist(results.R_hit);
 
@@ -105,8 +109,29 @@ function X = stack_gust_axis(v_gust_ts, ax, n_max)
     end
 end
 
-function plot_time_stats(t, X, ttl, ylab)
-% Plot mean, mean +/- 1 std, mean +/- 3 std, and min/max vs time.
+function X = stack_cell_row_axis(C, row_idx, ax, n_max)
+% Build [n_runs x n_max] matrix from one missile row and one vector axis.
+
+    n_runs = size(C, 2);
+    X = nan(n_runs, n_max);
+    for k = 1:n_runs
+        v = C{row_idx, k};
+        if ~isempty(v)
+            row = v(ax, :);
+            X(k, 1:numel(row)) = row;
+        end
+    end
+end
+
+function plot_time_stats(t, X, ttl, ylab, show_three_sigma, accel_limit)
+% Plot mean, mean +/- 1 std, optional mean +/- 3 std, and min/max vs time.
+
+    if nargin < 5
+        show_three_sigma = true;
+    end
+    if nargin < 6
+        accel_limit = [];
+    end
 
     mu    = mean(X, 1, 'omitnan');
     s     = std(X, 0, 1, 'omitnan');
@@ -124,11 +149,18 @@ function plot_time_stats(t, X, ttl, ylab)
     % min/max envelope
     fill_between(t, x_min, x_max, [0.90 0.90 0.90], 'min/max');
 
-    % +/- 3 sigma band
-    fill_between(t, mu - 3*s, mu + 3*s, [0.75 0.83 0.95], '\pm 3\sigma');
+    if show_three_sigma
+        % +/- 3 sigma band
+        fill_between(t, mu - 3*s, mu + 3*s, [0.75 0.83 0.95], '\pm 3\sigma');
+    end
 
     % +/- 1 sigma band
     fill_between(t, mu - s, mu + s, [0.55 0.70 0.90], '\pm 1\sigma');
+
+    if ~isempty(accel_limit) && isfinite(accel_limit)
+        yline(accel_limit, 'r--', 'LineWidth', 1.4, 'DisplayName', '+a_{max}');
+        yline(-accel_limit, 'r--', 'LineWidth', 1.4, 'DisplayName', '-a_{max}');
+    end
 
     plot(t, mu, 'k-', 'LineWidth', 1.8, 'DisplayName', 'mean');
 
@@ -160,6 +192,31 @@ function X = stack_cell_all(C, n_max)
     blocks = cell(m, 1);
     for i = 1:m
         blocks{i} = stack_cell_row(C, i, n_max);
+    end
+    X = vertcat(blocks{:});
+end
+
+function X = stack_cell_all_axis(C, ax, n_max)
+% Build [(n_runs*m) x n_max] matrix pooling all missiles for one vector axis.
+
+    m = size(C, 1);
+    blocks = cell(m, 1);
+    for i = 1:m
+        blocks{i} = stack_cell_row_axis(C, i, ax, n_max);
+    end
+    X = vertcat(blocks{:});
+end
+
+function X = stack_cell_all_axes(C, n_max)
+% Build [(n_runs*m*3) x n_max] matrix pooling all missiles and all axes.
+
+    m = size(C, 1);
+    blocks = cell(m, 1);
+    for i = 1:m
+        row_x = stack_cell_row_axis(C, i, 1, n_max);
+        row_y = stack_cell_row_axis(C, i, 2, n_max);
+        row_z = stack_cell_row_axis(C, i, 3, n_max);
+        blocks{i} = [row_x; row_y; row_z];
     end
     X = vertcat(blocks{:});
 end

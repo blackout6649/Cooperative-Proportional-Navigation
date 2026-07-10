@@ -12,7 +12,7 @@ N_mc            = 10;
 m_3D            = 3;
 N_3D            = 3;
 K_gain_3D       = 40;
-A_max_3D        = 100;
+A_max_3D        = 35;
 R_hit_3D        = 1;
 
 tend_3D         = 30;
@@ -45,6 +45,7 @@ t_end_vec       = zeros(1, N_mc);
 
 N_CPN_ts        = cell(m_3D, N_mc);
 epsilon_ts      = cell(m_3D, N_mc);
+a_com_ts        = cell(m_3D, N_mc);
 v_gust_ts       = cell(1, N_mc);
 t_run_vec       = cell(1, N_mc);
 
@@ -109,6 +110,7 @@ for k = 1:N_mc
         r_min_end(i, k) = min(data.r_go{i});
         N_CPN_ts{i, k} = data.N_CPN{i};
         epsilon_ts{i, k} = data.epsilon{i};
+        a_com_ts{i, k} = data.a_com{i};
 
         if data.hit
             gamma_hit = data.gammaM{i}(:, end);
@@ -135,6 +137,7 @@ results.R_hit        = R_hit_vec;
 results.N_CPN_end    = N_CPN_end;
 results.N_CPN_ts     = N_CPN_ts;
 results.epsilon_ts   = epsilon_ts;
+results.a_com_ts     = a_com_ts;
 results.v_gust_ts    = v_gust_ts;
 results.t_run_vec    = t_run_vec;
 results.r_min_end    = r_min_end;
@@ -146,6 +149,7 @@ results.tau_f        = tau_f_vec;
 results.tau_sk       = tau_sk_vec;
 results.sigma_RM     = sigma_RM_vec;
 results.sigma_VM     = sigma_VM_vec;
+results.A_max        = A_max_3D;
 
 results.P_hit        = mean(hit_vec);
 results.hit_probability = results.P_hit;
