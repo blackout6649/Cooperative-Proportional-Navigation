@@ -1,6 +1,6 @@
 %% GUIDANCE AND NAVIGATION - MONTE CARLO (3D CPN)
 % This script runs MC trials for CPN_3D with method (A) wind modeling.
-% Wind is modeled as zero-mean Gaussian velocity samples with sampled std.
+% Wind is modeled as a Gauss-Markov process with sampled std and length scale.
 
 clear; clc;
 
@@ -22,9 +22,13 @@ n_sim           = length(t_vec);
 
 T_x0_3D         = [0, 0, 2500];
 
-% Gaussian gust std ranges for MC sampling [m/s] in x,y,z.
+% Gauss-Markov gust parameter ranges for MC sampling.
+% sigma_gust is the steady-state gust std [m/s] in x,y,z.
+% L_gust is the turbulence length scale [m] in x,y,z.
 gust_sigma_min  = [2; 2; 1];
 gust_sigma_max  = [12; 12; 5];
+gust_L_min      = [100; 100; 50];
+gust_L_max      = [400; 400; 200];
 
 %% Outputs tracked per run
 hit_vec         = false(1, N_mc);
@@ -65,7 +69,10 @@ for k = 1:N_mc
 
     % Additional random input: gust realization for this run.
     sigma_gust = sample_uniform(gust_sigma_min, gust_sigma_max);
-    v_gust = generate_normal_gust(sigma_gust, n_sim);
+    L_gust = sample_uniform(gust_L_min, gust_L_max);
+
+    V_ref = mean(cell2mat(M_V_vec_3D));
+    v_gust = generate_gauss_markov_gust(sigma_gust, L_gust, V_ref, dt_3D, n_sim);
 
     data = CPN_3D(m_3D, N_3D, K_gain_3D, A_max_3D, R_hit_3D, tau_m_3D, ...
         tau_f_3D, tau_sk_3D, tend_3D, dt_3D, T_x0_3D, M_x0_vec_3D, ...
@@ -133,10 +140,23 @@ function x = sample_uniform(a, b)
     x = a + (b - a) .* rand(size(a));
 end
 
-function w = generate_normal_gust(sigma, n_sim)
-% Generate 3D gust profile with zero-mean Gaussian samples.
-% sigma: 3x1 standard deviation [m/s] for x,y,z.
+function w = generate_gauss_markov_gust(sigma, Lc, V_ref, dt, n_sim)
+% Generate 3D gust profile using an axis-wise first-order Gauss-Markov process.
+% sigma: 3x1 steady-state std [m/s], Lc: 3x1 length scale [m].
 
     sigma = sigma(:);
-    w = sigma .* randn(3, n_sim);
+    Lc = Lc(:);
+
+    V_ref = max(V_ref, 1e-6);
+    tau = max(Lc ./ V_ref, 1e-6);
+
+    beta = exp(-dt ./ tau);
+    q = sigma .* sqrt(1 - beta.^2);
+
+    w = zeros(3, n_sim);
+    w(:, 1) = sigma .* randn(3, 1);
+
+    for t = 1:(n_sim - 1)
+        w(:, t+1) = beta .* w(:, t) + q .* randn(3, 1);
+    end
 end
