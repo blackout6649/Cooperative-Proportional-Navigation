@@ -7,10 +7,10 @@ tau_sk = U(0.01, 0.2)             # seeker lag time constant [sec]
 M_x0_vec_3D{i} = [r0*cos(ang0), r0*sin(ang0), 0]    # missile initial position [m]
 ang0 = 2*pi*(i - 1 + U(0,1))                         # angular sample (per missile)
 r0 = sqrt(R_min_3D^2 + U(0,1)*(R_init_3D^2 - R_min_3D^2))
-R_min_3D = 9000
-R_init_3D = 15000
+R_min_3D = 2000
+R_init_3D = 3000
 
-M_V_vec_3D{i} = U(200, 300)       # missile speed [m/sec]
+M_V_vec_3D{i} = U(100, 150)       # missile speed [m/sec]
 
 M_gamma0_vec_3D{i} = [phi0, theta0, psi0]            # initial heading [deg]
 phi0 = U(60, 120)
@@ -24,8 +24,8 @@ L_gust = U^3([100, 100, 50], [400, 400, 200])       # Gauss-Markov length scale 
 
 v_gust(t) = first-order Gauss-Markov process         # 3 x n_sim gust profile [m/sec]
 
-sigma_RM = U^3([0, 0, 0], [1, 1, 1])                # RM measurement-noise std [m]
-sigma_VM = U^3([0, 0, 0], [0.01, 0.01, 0.01])       # VM measurement-noise std [m/sec]
+sigma_RM = U^3([0, 0, 0], [0.3, 0.3, 0.3])          # RM measurement-noise std [m]
+sigma_VM = U^3([0, 0, 0], [0.05, 0.05, 0.05])       # VM measurement-noise std [m/sec]
 
 ## SUCCESS CRITERION
 

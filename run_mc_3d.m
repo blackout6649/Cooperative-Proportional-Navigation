@@ -7,7 +7,7 @@ clear; clc;
 %% Fixed scenario parameters
 %rng(1); % reproducible MC sequence
 
-N_mc            = 1;
+N_mc            = 1000;
 
 m_3D            = 3;
 N_3D            = 3;
@@ -15,8 +15,8 @@ K_gain_3D       = 40;
 A_max_3D        = 35;
 R_hit_3D        = 1;
 
-tend_3D         = 200;
-dt_3D           = 0.01;
+tend_3D         = 30;
+dt_3D           = 0.001;
 t_vec           = 0:dt_3D:tend_3D;
 n_sim           = length(t_vec);
 
@@ -32,9 +32,9 @@ gust_L_max      = [400; 400; 200];
 
 % Measurement noise std ranges for RM [m] and VM [m/s].
 sigma_RM_min    = [0; 0; 0];
-sigma_RM_max    = [1; 1; 1];
+sigma_RM_max    = [0.3; 0.3; 0.3];
 sigma_VM_min    = [0; 0; 0];
-sigma_VM_max    = [0.01; 0.01; 0.01];
+sigma_VM_max    = [0.05; 0.05; 0.05];
 
 %% Outputs tracked per run
 hit_vec         = false(1, N_mc);
@@ -74,14 +74,14 @@ for k = 1:N_mc
     M_gamma0_vec_3D = cell([m_3D 1]);
 
     % initial positions: sample each missile an annulus (R_min <= r <= R_init) on the x-y plane (z = 0) so they start at least R_min from the target.
-    R_init_3D = 15000;
-    R_min_3D  = 9000;
+    R_init_3D = 3000;
+    R_min_3D  = 2000;
 
     for i = 1:m_3D
         ang0              = 2 * pi * (i - 1 + rand);
         r0                = sqrt(R_min_3D^2 + rand * (R_init_3D^2 - R_min_3D^2));
         M_x0_vec_3D{i}     = [r0 * cos(ang0), r0 * sin(ang0), 0];
-        M_V_vec_3D{i}      = sample_uniform(200, 300);
+        M_V_vec_3D{i}      = sample_uniform(100, 150);
         % heading [phi, theta, psi]: elevation theta ~ 90 deg (straight up) +-10 deg
         M_gamma0_vec_3D{i} = [sample_uniform(60, 120), ...
                               sample_uniform(80, 100), ...

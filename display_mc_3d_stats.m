@@ -11,7 +11,7 @@ S = load('mc_results_3d.mat', 'results');
 results = S.results;
 
 fprintf('MC runs: %d\n', results.N_mc);
-fprintf('All-missiles hit probability: %.6f\n', results.hit_probability);
+fprintf('All-missiles hit probability: %.3f\n', results.hit_probability);
 
 m = size(results.N_CPN_ts, 1);
 
