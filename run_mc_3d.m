@@ -5,9 +5,9 @@
 clear; clc;
 
 %% Fixed scenario parameters
-rng(1); % reproducible MC sequence
+%rng(1); % reproducible MC sequence
 
-N_mc            = 10;
+N_mc            = 1;
 
 m_3D            = 3;
 N_3D            = 3;
@@ -15,12 +15,12 @@ K_gain_3D       = 40;
 A_max_3D        = 35;
 R_hit_3D        = 1;
 
-tend_3D         = 30;
-dt_3D           = 0.001;
+tend_3D         = 200;
+dt_3D           = 0.01;
 t_vec           = 0:dt_3D:tend_3D;
 n_sim           = length(t_vec);
 
-T_x0_3D         = [0, 0, 2500];
+T_x0_3D         = [0, 0, 0];
 
 % Gauss-Markov gust parameter ranges for MC sampling.
 % sigma_gust is the steady-state gust std [m/s] in x,y,z.
@@ -32,20 +32,21 @@ gust_L_max      = [400; 400; 200];
 
 % Measurement noise std ranges for RM [m] and VM [m/s].
 sigma_RM_min    = [0; 0; 0];
-sigma_RM_max    = [5; 5; 5];
+sigma_RM_max    = [1; 1; 1];
 sigma_VM_min    = [0; 0; 0];
-sigma_VM_max    = [2; 2; 2];
+sigma_VM_max    = [0.01; 0.01; 0.01];
 
 %% Outputs tracked per run
 hit_vec         = false(1, N_mc);
-R_hit_vec       = zeros(1, N_mc);
 N_CPN_end       = zeros(m_3D, N_mc);
 r_min_end       = zeros(m_3D, N_mc);
+miss_distance_min_vec = nan(1, N_mc);
 t_end_vec       = zeros(1, N_mc);
 
 N_CPN_ts        = cell(m_3D, N_mc);
 epsilon_ts      = cell(m_3D, N_mc);
 a_com_ts        = cell(m_3D, N_mc);
+a_uncapped_ts   = cell(m_3D, N_mc);
 v_gust_ts       = cell(1, N_mc);
 t_run_vec       = cell(1, N_mc);
 
@@ -72,10 +73,19 @@ for k = 1:N_mc
     M_V_vec_3D      = cell([m_3D 1]);
     M_gamma0_vec_3D = cell([m_3D 1]);
 
+    % initial positions: sample each missile an annulus (R_min <= r <= R_init) on the x-y plane (z = 0) so they start at least R_min from the target.
+    R_init_3D = 15000;
+    R_min_3D  = 9000;
+
     for i = 1:m_3D
-        M_x0_vec_3D{i}     = sample_uniform(-500 .* ones(1, 3), 500 .* ones(1, 3));
-        M_V_vec_3D{i}      = sample_uniform(100, 150);
-        M_gamma0_vec_3D{i} = sample_uniform(60 .* ones(1, 3), 120 .* ones(1, 3));
+        ang0              = 2 * pi * (i - 1 + rand);
+        r0                = sqrt(R_min_3D^2 + rand * (R_init_3D^2 - R_min_3D^2));
+        M_x0_vec_3D{i}     = [r0 * cos(ang0), r0 * sin(ang0), 0];
+        M_V_vec_3D{i}      = sample_uniform(200, 300);
+        % heading [phi, theta, psi]: elevation theta ~ 90 deg (straight up) +-10 deg
+        M_gamma0_vec_3D{i} = [sample_uniform(60, 120), ...
+                              sample_uniform(80, 100), ...
+                              sample_uniform(60, 120)];
     end
 
     % Additional random input: gust realization for this run.
@@ -87,23 +97,31 @@ for k = 1:N_mc
     V_ref = mean(cell2mat(M_V_vec_3D));
     v_gust = generate_gauss_markov_gust(sigma_gust, L_gust, V_ref, dt_3D, n_sim);
 
+
     data = CPN_3D(m_3D, N_3D, K_gain_3D, A_max_3D, R_hit_3D, tau_m_3D, ...
         tau_f_3D, tau_sk_3D, tend_3D, dt_3D, T_x0_3D, M_x0_vec_3D, ...
-        M_V_vec_3D, M_gamma0_vec_3D, v_gust, 0, 0, sigma_RM, sigma_VM);
+        M_V_vec_3D, M_gamma0_vec_3D, v_gust, sigma_RM, sigma_VM);
 
-    hit_vec(k)   = logical(data.hit);
-    R_hit_vec(k) = data.R_hit;
+    if isfield(data, 'hit_flags')
+        run_success = all(logical(data.hit_flags));
+    else
+        run_success = logical(data.hit);
+    end
+
+    hit_vec(k)   = run_success;
     t_end_vec(k) = data.t_vec(end);
     t_run_vec{k} = data.t_vec;
     sigma_RM_vec(:, k) = sigma_RM(:);
     sigma_VM_vec(:, k) = sigma_VM(:);
 
-    if data.hit
+    if run_success
         impact_time_vec(k) = data.t_vec(end);
     end
 
     n_k = length(data.t_vec);
     v_gust_ts{k} = data.v_gust(:, 1:n_k);
+
+    miss_distance_min_run = inf;
 
     for i = 1:m_3D
         N_CPN_end(i, k) = data.N_CPN{i}(end);
@@ -111,12 +129,18 @@ for k = 1:N_mc
         N_CPN_ts{i, k} = data.N_CPN{i};
         epsilon_ts{i, k} = data.epsilon{i};
         a_com_ts{i, k} = data.a_com{i};
+        a_uncapped_ts{i, k} = data.a_uncapped{i};
 
-        if data.hit
+        r_go_true_i = sqrt(sum((data.RT - data.RM{i}) .^ 2, 1));
+        miss_distance_min_run = min(miss_distance_min_run, min(r_go_true_i));
+
+        if run_success
             gamma_hit = data.gammaM{i}(:, end);
             hit_angle_vec(i, k, :) = [gamma_hit(3), gamma_hit(2), gamma_hit(1)];
         end
     end
+
+    miss_distance_min_vec(k) = miss_distance_min_run;
 
     tau_m_vec(k)  = tau_m_3D;
     tau_f_vec(k)  = tau_f_3D;
@@ -129,15 +153,21 @@ if isgraphics(wb)
     close(wb);
 end
 
+% for a single run, show the 3D trajectory of that run
+if N_mc == 1
+    plot_trajectory_3d(data);
+end
+
 %% Aggregate MC results
 results = struct;
 results.N_mc         = N_mc;
 results.hit          = hit_vec;
-results.R_hit        = R_hit_vec;
+results.miss_distance_min = miss_distance_min_vec;
 results.N_CPN_end    = N_CPN_end;
 results.N_CPN_ts     = N_CPN_ts;
 results.epsilon_ts   = epsilon_ts;
 results.a_com_ts     = a_com_ts;
+results.a_uncapped_ts = a_uncapped_ts;
 results.v_gust_ts    = v_gust_ts;
 results.t_run_vec    = t_run_vec;
 results.r_min_end    = r_min_end;
@@ -156,7 +186,7 @@ results.hit_probability = results.P_hit;
 results.mean_r_min   = mean(r_min_end, 2);
 results.mean_N_CPN   = mean(N_CPN_end, 2);
 
-save('mc_results_3d.mat', 'results');
+save('mc_results_3d.mat', 'results', '-v7.3');
 
 %% Local helper functions
 function x = sample_uniform(a, b)

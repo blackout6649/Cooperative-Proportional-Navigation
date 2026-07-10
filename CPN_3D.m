@@ -1,18 +1,12 @@
 %% GUIDANCE AND NAVIGATION - FINAL PROJECT NUMERICAL SIMULATION
 
 %% 3-D GNC simulation function
-function data = CPN_3D(m, N, K_gain, A_max, R_hit, tau_m, tau_f, tau_sk, tend, dt, T_x0, M_x0_vec, M_V_vec, M_gamma0_vec, v_gust, gvis, save_fig, sigma_RM, sigma_VM)
-if nargin < 19
+function data = CPN_3D(m, N, K_gain, A_max, R_hit, tau_m, tau_f, tau_sk, tend, dt, T_x0, M_x0_vec, M_V_vec, M_gamma0_vec, v_gust, sigma_RM, sigma_VM)
+if nargin < 17
     sigma_VM = 0;
 end
-if nargin < 18
+if nargin < 16
     sigma_RM = 0;
-end
-if nargin == 16
-    save_fig = 0;
-elseif nargin == 15
-    save_fig = 0;
-    gvis     = 0;
 end
 
 %% preallcation
@@ -21,6 +15,8 @@ n_sim = length(t_vec);
 a_max = 9.8 * A_max;
 K = K_gain;
 hit = 0;
+hit_flags = false(m, 1);   % per-missile hit status
+t_hit     = nan(m, 1);     % time index at which each missile hits
 
 if isvector(v_gust)
     v_gust = repmat(v_gust(:), 1, n_sim);
@@ -49,6 +45,7 @@ omega_m     = cell([m 1]);
 omega_f     = cell([m 1]);
 N_CPN       = cell([m 1]);
 a_com       = cell([m 1]);
+a_uncapped  = cell([m 1]);
 a_ideal     = cell([m 1]);
 w_com       = cell([m 1]);
 mean_t_go   = zeros(1, n_sim);
@@ -69,6 +66,7 @@ for i = 1:m
     omega_m     {i} = zeros(3, n_sim);
     omega_f     {i} = zeros(3, n_sim);
     a_com       {i} = zeros(3, n_sim);
+    a_uncapped  {i} = zeros(3, n_sim);
     a_ideal     {i} = zeros(3, n_sim);
     w_com       {i} = zeros(3, n_sim);
     r_go        {i} = zeros(1, n_sim);
@@ -91,9 +89,6 @@ for i = 1:m
     phi     = gammaM{i}(1, t); % roll
     theta   = gammaM{i}(2, t); % pitch
     psi     = gammaM{i}(3, t); % yaw
-
-    r_rel_true      = RT(:, t) - RM{i}(:, t);
-    r_go_true       = sqrt(sum(r_rel_true .^ 2));
 
     RM_meas         = RM{i}(:, t) + sigma_RM .* randn(3, 1);
     r_rel{i}(:, t)  = RT(:, t) - RM_meas;
@@ -148,8 +143,8 @@ for i = 1:m
 
     N_CPN{i}(t) = N * (1 - K * r_go{i}(t) * epsilon{i}(t));
 
-    a = N_CPN{i}(t) .* cross(omega_f{i}(:, t), VM{i}(:, t));
-    a_ideal{i}(:, t) = sign(a) .* min(abs(a), a_max);
+    a_uncapped{i}(:, t) = N_CPN{i}(t) .* cross(omega_f{i}(:, t), VM{i}(:, t));
+    a_ideal{i}(:, t) = sign(a_uncapped{i}(:, t)) .* min(abs(a_uncapped{i}(:, t)), a_max);
     if tau_m > 0 && t < n_sim
         a_com{i}(:, t+1)  = a_com{i}(:, t) + (a_ideal{i}(:, t) - a_com{i}(:, t));
     elseif tau_m == 0
@@ -159,128 +154,82 @@ for i = 1:m
     w_com{i}(:, t) = -cross(VM{i}(:, t), a_com{i}(:, t)) / (VMtot{i}^2);
 
     if t < n_sim
-    RM{i}(:, t+1)   = RM{i}(:, t) + dt .* (VM{i}(:, t) + v_gust(:, t));
-    RT(:, t+1)      = RT(:, t);
-    
-    gammaM{i}(:, t+1)  = gammaM{i}(:, t) + dt .* w_com{i}(:, t);
-    V = (VM{i}(:, t) + a_com{i}(:, t) .* dt);
-    VM{i}(:, t+1) = V .* VMtot{i}/sqrt(sum(V.^2));
+        % propagate the missile state, or hold it frozen after it has hit
+        if hit_flags(i)
+            RM{i}(:, t+1)      = RM{i}(:, t);
+            gammaM{i}(:, t+1)  = gammaM{i}(:, t);
+            VM{i}(:, t+1)      = VM{i}(:, t);
+        else
+            RM{i}(:, t+1)      = RM{i}(:, t) + dt .* (VM{i}(:, t) + v_gust(:, t));
+            gammaM{i}(:, t+1)  = gammaM{i}(:, t) + dt .* w_com{i}(:, t);
+            V = (VM{i}(:, t) + a_com{i}(:, t) .* dt);
+            VM{i}(:, t+1)      = V .* VMtot{i}/sqrt(sum(V.^2));
+        end
     end
 
-    if r_go_true <= R_hit
-        hit = 1;
+    % per-missile hit detection: freeze this missile once it hits
+    if ~hit_flags(i)
+        r_go_true_i = sqrt(sum((RT(:, t) - RM{i}(:, t)) .^ 2));
+        if r_go_true_i <= R_hit
+            hit_flags(i) = true;
+            t_hit(i)     = t;
+            if t < n_sim
+                RM{i}(:, t+1)      = RM{i}(:, t);
+                gammaM{i}(:, t+1)  = gammaM{i}(:, t);
+                VM{i}(:, t+1)      = VM{i}(:, t);
+            end
+        end
+    end
+end
+
+    % target is stationary
+    if t < n_sim
+        RT(:, t+1) = RT(:, t);
+    end
+
+    % end the simulation once every missile has hit
+    if all(hit_flags)
         break
     end
 end
-    if hit == 1; break; end
+
+% hit flag is true only if ALL missiles hit the target
+hit = all(hit_flags);
+
+t_vec           = t_vec     (:, 1:t);
+RT              = RT        (:, 1:t);
+VT              = VT        (:, 1:t);
+mean_t_go       = mean_t_go (:, 1:t);
+
+for i = 1:m
+r_rel       {i} = r_rel     {i}(:, 1:t);
+RM          {i} = RM        {i}(:, 1:t);
+gammaM      {i} = gammaM    {i}(:, 1:t);
+VM          {i} = VM        {i}(:, 1:t);
+V_rel       {i} = V_rel     {i}(:, 1:t);
+omega       {i} = omega     {i}(:, 1:t);
+omega_m     {i} = omega_m   {i}(:, 1:t);
+omega_f     {i} = omega_f   {i}(:, 1:t);
+a_com       {i} = a_com     {i}(:, 1:t);
+a_uncapped  {i} = a_uncapped{i}(:, 1:t);
+a_ideal     {i} = a_ideal   {i}(:, 1:t);
+w_com       {i} = w_com     {i}(:, 1:t);
+r_go        {i} = r_go      {i}(:, 1:t);
+r_go_dot    {i} = r_go_dot  {i}(:, 1:t);
+t_go        {i} = t_go      {i}(:, 1:t);
+N_CPN       {i} = N_CPN     {i}(:, 1:t);
+sigma       {i} = sigma     {i}(:, 1:t);
+epsilon     {i} = epsilon   {i}(:, 1:t);
 end
 
-if hit == 1
-    t_vec           = t_vec     (:, 1:t);
-    RT              = RT        (:, 1:t);
-    VT              = VT        (:, 1:t);
-    mean_t_go       = mean_t_go (:, 1:t);
-
-    for i = 1:m
-    r_rel       {i} = r_rel     {i}(:, 1:t);
-    RM          {i} = RM        {i}(:, 1:t);
-    gammaM      {i} = gammaM    {i}(:, 1:t);
-    VM          {i} = VM        {i}(:, 1:t);
-    V_rel       {i} = V_rel     {i}(:, 1:t);
-    omega       {i} = omega     {i}(:, 1:t);
-    omega_m     {i} = omega_m   {i}(:, 1:t);
-    omega_f     {i} = omega_f   {i}(:, 1:t);
-    a_com       {i} = a_com     {i}(:, 1:t);
-    a_ideal     {i} = a_ideal   {i}(:, 1:t);
-    w_com       {i} = w_com     {i}(:, 1:t);
-    r_go        {i} = r_go      {i}(:, 1:t);
-    r_go_dot    {i} = r_go_dot  {i}(:, 1:t);
-    t_go        {i} = t_go      {i}(:, 1:t);
-    N_CPN       {i} = N_CPN     {i}(:, 1:t);
-    sigma       {i} = sigma     {i}(:, 1:t);
-    epsilon     {i} = epsilon   {i}(:, 1:t);
+% convert per-missile hit indices to hit times [sec]
+t_hit_time = nan(m, 1);
+for i = 1:m
+    if hit_flags(i)
+        t_hit_time(i) = t_vec(t_hit(i));
     end
 end
 
-
-%% graphing
-
-xT = RT(1, :);
-yT = RT(2, :);
-zT = RT(3, :);
-
-xM = zeros(m, length(t_vec));
-yM = zeros(m, length(t_vec));
-zM = zeros(m, length(t_vec));
-
-for i = 1:m
-    xM(i, :) = RM{i}(1, :);
-    yM(i, :) = RM{i}(2, :);
-    zM(i, :) = RM{i}(3, :);
-end
-marker_step = 5000;
-
-xM_marker = [xM(:, 1:marker_step:end), xM(:, end)];
-yM_marker = [yM(:, 1:marker_step:end), yM(:, end)];
-zM_marker = [zM(:, 1:marker_step:end), zM(:, end)];
-xT_marker = [xT(:, 1:marker_step:end), xT(:, end)];
-yT_marker = [yT(:, 1:marker_step:end), yT(:, end)];
-zT_marker = [zT(:, 1:marker_step:end), zT(:, end)];
-
-min_x = min([min(xM), xT]);
-min_y = min([min(yM), yT]);
-min_z = min([min(zM), zT]);
-max_x = max([max(xM), xT]);
-max_y = max([max(yM), yT]);
-max_z = max([max(zM), zT]);
-
-% figure(Visible=gvis)
-if gvis || save_fig
-figure(Visible=gvis)
-
-    plot3(xM(1, :), yM(1, :), zM(1, :), 'r-', LineWidth=1.5, DisplayName="Missile paths")
-hold on
-    
-        plot3([xM_marker(1, :); xT_marker], [yM_marker(1, :); yT_marker], [zM_marker(1, :); zT_marker], ...
-             'k--', HandleVisibility='off')
-        
-        plot3(xM_marker(1, :), yM_marker(1, :), zM_marker(1, :), 'or', LineWidth=2, ...
-             MarkerSize=7, MarkerFaceColor='auto', HandleVisibility='off')
-    
-    if m > 1; for i = 2:m
-    
-        plot3(xM(i, :), yM(i, :), zM(i, :), 'r-', LineWidth=1.5, HandleVisibility='off')
-        
-            plot3([xM_marker(i, :); xT_marker], [yM_marker(i, :); yT_marker], [zM_marker(i, :); zT_marker], ...
-                 'k--', HandleVisibility='off')
-            
-            plot3(xM_marker(i, :), yM_marker(i, :), zM_marker(i, :), 'or', LineWidth=2, ...
-                 MarkerSize=7, MarkerFaceColor='auto', HandleVisibility='off')
-    
-    end; end
-    
-    plot3(xT, yT, zT, 'ob-.', MarkerIndices=[1, length(xT)], MarkerSize=7, ...
-        MarkerFaceColor='auto', LineWidth=2.5, HandleVisibility='off')
-    
-        plot3(xT_marker, yT_marker, zT_marker, 'ob', LineWidth=2, ...
-            MarkerSize=7, MarkerFaceColor='auto', DisplayName="Target")
-    
-    title("3D CPN Simulation", m + " Cooprative missiles")
-    
-    legend(autoupdate="on", Location="southeast")
-    xlabel("x [m]")
-    ylabel("z [m]")
-    xlim([min_x - 100, max_x + 100])
-    ylim([min_y - 100, max_y + 100])
-    zlim([min_z - 100, max_z + 100])
-    grid on
-    hold off
-
-if save_fig
-    set(gcf,'units','pix','pos',[0,0,1920,1080])
-    saveas(gcf, "3D_GNC_sim_" + m + "_missiles" + ".png")
-end
-end
 
 %% data logging
 data = struct;
@@ -298,6 +247,7 @@ data.omega       = omega     ;
 data.omega_m     = omega_m   ;
 data.omega_f     = omega_f   ;
 data.a_com       = a_com     ;
+data.a_uncapped  = a_uncapped;
 data.a_ideal     = a_ideal   ;
 % data.w_com       = w_com     ;
 data.r_go        = r_go      ;
@@ -307,6 +257,8 @@ data.N_CPN       = N_CPN     ;
 data.sigma       = sigma     ;
 data.epsilon     = epsilon   ;
 data.hit         = hit       ;
+data.hit_flags   = hit_flags ;
+data.t_hit       = t_hit_time;
 data.R_hit       = R_hit     ;
 data.K           = K         ;
 data.m           = m         ;
@@ -343,8 +295,6 @@ end
     % v_gust        - wind gust velocity profile [m/sec]
                         % either 3x1 (constant gust) or 3xn_sim (time-varying)
 
-    % gvis          - show graph of missile paths, 1 = show, 0 = no show
-    % save_fig      - save graph of missile paths, 1 = save, 0 = no save
     % sigma_RM      - RM measurement noise std, scalar or 3x1, in [m]
     % sigma_VM      - VM measurement noise std, scalar or 3x1, in [m/sec]
 
@@ -364,13 +314,16 @@ end
     % data.omega_f     - measured & filtered LOS rate of change over time, in [rad/sec]
     % data.a_ideal     - ideal acceleration command for each missile, in [m/sec^2]
     % data.a_com       - true acceleration command for each missile, in [m/sec^2]
+    % data.a_uncapped  - uncapped guidance acceleration for each missile, in [m/sec^2]
     % data.r_go        - missiles' closing distance over time, in [m]
     % data.r_go_dot    - missiles' closing velocity over time, in [m/sec]
     % data.t_go        - estimated time to go for each missile, in [sec]
     % data.N_CPN       - time-varying navigation gain
     % data.sigma       - spatial heading error, in [rad]
     % data.epsilon     - relative ttg error for the cooprative control
-    % data.hit         - simulation hit flag, 1 = hit, 0 = no hit
+    % data.hit         - simulation hit flag, 1 = ALL missiles hit, 0 = otherwise
+    % data.hit_flags   - per-missile hit status (mx1 logical)
+    % data.t_hit       - per-missile hit time (mx1), NaN if missile did not hit, in [sec]
     % data.R_hit       - hit detection radius, in [m]
     % data.K           - cooprative navigation constant
     % data.m           - number of missiles

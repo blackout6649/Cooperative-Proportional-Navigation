@@ -11,7 +11,7 @@ S = load('mc_results_3d.mat', 'results');
 results = S.results;
 
 fprintf('MC runs: %d\n', results.N_mc);
-fprintf('Hit probability: %.6f\n', results.hit_probability);
+fprintf('All-missiles hit probability: %.6f\n', results.hit_probability);
 
 m = size(results.N_CPN_ts, 1);
 
@@ -52,8 +52,12 @@ end
 X = stack_cell_all_axes(results.a_com_ts, n_max) ./ 9.8;
 plot_time_stats(t_grid, X, 'a_{com} - All Missiles and Axes Combined', 'a_{com} [g]', false, results.A_max);
 
-%% R_hit histogram
-plot_R_hit_hist(results.R_hit);
+%% a_uncapped vs time (single figure: all missiles, all axes, in g)
+X = stack_cell_all_axes(results.a_uncapped_ts, n_max) ./ 9.8;
+plot_time_stats(t_grid, X, 'a_{uncapped} - All Missiles and Axes Combined', 'a_{uncapped} [g]', false, results.A_max);
+
+%% Miss-distance histogram
+plot_miss_distance_hist(results.miss_distance_min);
 
 %% Time of impact histogram
 plot_impact_time_hist(results.impact_time, results.N_mc);
@@ -221,20 +225,40 @@ function X = stack_cell_all_axes(C, n_max)
     X = vertcat(blocks{:});
 end
 
-function plot_R_hit_hist(R_hit)
-% Histogram of R_hit across all MC runs.
+function X = stack_cell_all_magnitudes(C, n_max)
+% Build [(n_runs*m) x n_max] matrix of vector magnitudes pooled over all missiles.
 
-    R_hit = R_hit(:);
+    m = size(C, 1);
+    blocks = cell(m, 1);
+    for i = 1:m
+        n_runs = size(C, 2);
+        X_i = nan(n_runs, n_max);
+        for k = 1:n_runs
+            v = C{i, k};
+            if ~isempty(v)
+                mag = sqrt(sum(v.^2, 1));
+                X_i(k, 1:numel(mag)) = mag;
+            end
+        end
+        blocks{i} = X_i;
+    end
+    X = vertcat(blocks{:});
+end
 
-    figure('Name', 'R_{hit} Histogram');
-    histogram(R_hit);
+function plot_miss_distance_hist(miss_distance_min)
+% Histogram of closest-approach miss distance across all MC runs.
+
+    miss_distance_min = miss_distance_min(:);
+
+    figure('Name', 'Miss Distance Histogram');
+    histogram(miss_distance_min);
     grid on;
 
-    mu = mean(R_hit);
-    s  = std(R_hit);
+    mu = mean(miss_distance_min);
+    s  = std(miss_distance_min);
 
-    title(sprintf('R_{hit} Distribution (mean = %.4g, std = %.4g)', mu, s));
-    xlabel('R_{hit} [m]');
+    title(sprintf('Miss Distance Distribution (mean = %.4g, std = %.4g)', mu, s));
+    xlabel('miss\_distance\_min [m]');
     ylabel('count');
 end
 
