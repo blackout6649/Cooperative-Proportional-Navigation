@@ -127,14 +127,6 @@ results.mean_N_CPN   = mean(N_CPN_end, 2);
 
 save('mc_results_3d.mat', 'results');
 
-fprintf('MC runs: %d\n', N_mc);
-fprintf('Hit probability: %.4f\n', results.P_hit);
-fprintf('Saved results to mc_results_3d.mat\n');
-for i = 1:m_3D
-    fprintf('Missile %d: mean min range = %.3f m, mean final N_CPN = %.3f\n', ...
-        i, results.mean_r_min(i), results.mean_N_CPN(i));
-end
-
 %% Local helper functions
 function x = sample_uniform(a, b)
     x = a + (b - a) .* rand(size(a));
