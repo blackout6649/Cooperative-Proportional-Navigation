@@ -22,6 +22,10 @@ L\_gust 	= U^3(\[100, 100, 50], \[400, 400, 200]) 	# Gauss-Markov length scale p
 v\_gust(t) 	= first-order Gauss-Markov process 	# 3 x n\_sim gust profile, in \[m/sec]
 						% generated from sigma\_gust, L\_gust, V\_ref, dt
 
+sigma\_RM 	= U^3(\[0, 0, 0], \[5, 5, 5]) 	# RM measurement-noise std per axis, in \[m]
+
+sigma\_VM 	= U^3(\[0, 0, 0], \[2, 2, 2]) 	# VM measurement-noise std per axis, in \[m/sec]
+
 ## OUTPUT
 
 N\_CPN(t) 		# time-varying navigation gain; mx1 cell of time-series
@@ -35,4 +39,8 @@ R\_hit 			# hit radius used in the run, in \[m]
 hit 			# hit flag per run
 
 P\_hit 			# hit probability over all MC runs
+
+t\_impact 		# impact time for hit runs, in \[sec]
+
+hit\_angle 		# final hit attitude \[psi, theta, phi] from gammaM(:, end), in \[rad]
 

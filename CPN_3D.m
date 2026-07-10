@@ -1,7 +1,13 @@
 %% GUIDANCE AND NAVIGATION - FINAL PROJECT NUMERICAL SIMULATION
 
 %% 3-D GNC simulation function
-function data = CPN_3D(m, N, K_gain, A_max, R_hit, tau_m, tau_f, tau_sk, tend, dt, T_x0, M_x0_vec, M_V_vec, M_gamma0_vec, v_gust, gvis, save_fig)
+function data = CPN_3D(m, N, K_gain, A_max, R_hit, tau_m, tau_f, tau_sk, tend, dt, T_x0, M_x0_vec, M_V_vec, M_gamma0_vec, v_gust, gvis, save_fig, sigma_RM, sigma_VM)
+if nargin < 19
+    sigma_VM = 0;
+end
+if nargin < 18
+    sigma_RM = 0;
+end
 if nargin == 16
     save_fig = 0;
 elseif nargin == 15
@@ -21,6 +27,9 @@ if isvector(v_gust)
 elseif size(v_gust, 1) ~= 3 || size(v_gust, 2) ~= n_sim
     error('v_gust must be 3x1 or 3xn_sim.');
 end
+
+sigma_RM = expand_noise_std(sigma_RM);
+sigma_VM = expand_noise_std(sigma_VM);
 
 VMtot       = M_V_vec;
 RT          = zeros(3, n_sim); RT(:, 1) = T_x0;
@@ -83,15 +92,21 @@ for i = 1:m
     theta   = gammaM{i}(2, t); % pitch
     psi     = gammaM{i}(3, t); % yaw
 
-    r_rel{i}(:, t)  = RT(:, t) - RM{i}(:, t);
-    r_go{i}(t)      = sqrt( sum( r_rel{i}(:, t) .^ 2));
+    r_rel_true      = RT(:, t) - RM{i}(:, t);
+    r_go_true       = sqrt(sum(r_rel_true .^ 2));
+
+    RM_meas         = RM{i}(:, t) + sigma_RM .* randn(3, 1);
+    r_rel{i}(:, t)  = RT(:, t) - RM_meas;
+    r_go{i}(t)      = max(sqrt(sum(r_rel{i}(:, t) .^ 2)), eps);
 if t == 1
     VM{i}(:, t)     = VMtot{i} .* [cos(theta)*cos(psi),...
                                    cos(theta)*sin(psi),...
                                    sin(theta)];
 end
 
-    V_rel{i}(:, t)  = VT(:, t) - (VM{i}(:, t) + v_gust(:, t));
+    VM_meas         = VM{i}(:, t) + sigma_VM .* randn(3, 1);
+
+    V_rel{i}(:, t)  = VT(:, t) - (VM_meas + v_gust(:, t));
     r_go_dot{i}(t)  = dot(r_rel{i}(:, t), V_rel{i}(:, t)) / r_go{i}(t);
     omega{i}(:, t)  = cross(r_rel{i}(:, t), V_rel{i}(:, t)) / r_go{i}(t);
 
@@ -107,7 +122,9 @@ end
         omega_f{i}(:, t)    = omega_m{i}(:, t);
     end
 
-    sigma{i}(t) = acos(dot(r_rel{i}(:, t), VM{i}(:, t)) / (r_go{i}(:, t) * VMtot{i}));
+    vm_meas_norm = max(norm(VM_meas), eps);
+    cos_sigma = dot(r_rel{i}(:, t), VM_meas) / (r_go{i}(t) * vm_meas_norm);
+    sigma{i}(t) = acos(max(-1, min(1, cos_sigma)));
 
     t_go{i}(t)  = (1 + ( sigma{i}(t)^2 / (2*(2*N-1)) )) * (r_go{i}(:, t) / VMtot{i});
     
@@ -150,7 +167,7 @@ for i = 1:m
     VM{i}(:, t+1) = V .* VMtot{i}/sqrt(sum(V.^2));
     end
 
-    if r_go{i}(t) <= R_hit
+    if r_go_true <= R_hit
         hit = 1;
         break
     end
@@ -274,7 +291,7 @@ data.RT          = RT        ;
 % data.mean_t_go   = mean_t_go ;
 data.r_rel       = r_rel     ;
 data.RM          = RM        ;
-% data.gammaM      = gammaM    ;
+data.gammaM      = gammaM    ;
 data.VM          = VM        ;
 data.V_rel       = V_rel     ;
 data.omega       = omega     ;
@@ -328,6 +345,8 @@ end
 
     % gvis          - show graph of missile paths, 1 = show, 0 = no show
     % save_fig      - save graph of missile paths, 1 = save, 0 = no save
+    % sigma_RM      - RM measurement noise std, scalar or 3x1, in [m]
+    % sigma_VM      - VM measurement noise std, scalar or 3x1, in [m/sec]
 
 
 % output:
@@ -337,6 +356,7 @@ end
     % data.RT          - target location over time, in [m]
     % data.r_rel       - target location relative to missile over time, in [m]
     % data.RM          - missiles' location over time, in [m]
+    % data.gammaM      - missiles' heading angles over time [phi; theta; psi], in [rad]
     % data.VM          - missiles' velocity over time, in [m/sec]
     % data.V_rel       - target velocity relative to missile over time, in [m]
     % data.omega       - ideal LOS rate of change over time, in [rad/sec]
@@ -358,3 +378,15 @@ end
     % data.A_max       - max acceleration allowed for missiles, in [G]
     % data.VMtot       - missile total velocities, in [m/sec]
     % data.v_gust      - gust profile used in the simulation, in [m/sec]
+
+function sigma = expand_noise_std(sigma)
+    if isscalar(sigma)
+        sigma = sigma .* ones(3, 1);
+    else
+        sigma = sigma(:);
+    end
+
+    if numel(sigma) ~= 3
+        error('Measurement noise std must be scalar or 3x1.');
+    end
+end

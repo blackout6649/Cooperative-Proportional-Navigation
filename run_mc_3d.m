@@ -1,5 +1,5 @@
 %% GUIDANCE AND NAVIGATION - MONTE CARLO (3D CPN)
-% This script runs MC trials for CPN_3D with method (A) wind modeling.
+% This script runs MC trials for CPN_3D 
 % Wind is modeled as a Gauss-Markov process with sampled std and length scale.
 
 clear; clc;
@@ -30,6 +30,12 @@ gust_sigma_max  = [12; 12; 5];
 gust_L_min      = [100; 100; 50];
 gust_L_max      = [400; 400; 200];
 
+% Measurement noise std ranges for RM [m] and VM [m/s].
+sigma_RM_min    = [0; 0; 0];
+sigma_RM_max    = [5; 5; 5];
+sigma_VM_min    = [0; 0; 0];
+sigma_VM_max    = [2; 2; 2];
+
 %% Outputs tracked per run
 hit_vec         = false(1, N_mc);
 R_hit_vec       = zeros(1, N_mc);
@@ -45,6 +51,10 @@ t_run_vec       = cell(1, N_mc);
 tau_m_vec       = zeros(1, N_mc);
 tau_f_vec       = zeros(1, N_mc);
 tau_sk_vec      = zeros(1, N_mc);
+impact_time_vec = nan(1, N_mc);
+hit_angle_vec   = nan(m_3D, N_mc, 3);
+sigma_RM_vec    = zeros(3, N_mc);
+sigma_VM_vec    = zeros(3, N_mc);
 
 wb = waitbar(0, 'Running Monte Carlo simulation...');
 
@@ -70,18 +80,26 @@ for k = 1:N_mc
     % Additional random input: gust realization for this run.
     sigma_gust = sample_uniform(gust_sigma_min, gust_sigma_max);
     L_gust = sample_uniform(gust_L_min, gust_L_max);
+    sigma_RM = sample_uniform(sigma_RM_min, sigma_RM_max);
+    sigma_VM = sample_uniform(sigma_VM_min, sigma_VM_max);
 
     V_ref = mean(cell2mat(M_V_vec_3D));
     v_gust = generate_gauss_markov_gust(sigma_gust, L_gust, V_ref, dt_3D, n_sim);
 
     data = CPN_3D(m_3D, N_3D, K_gain_3D, A_max_3D, R_hit_3D, tau_m_3D, ...
         tau_f_3D, tau_sk_3D, tend_3D, dt_3D, T_x0_3D, M_x0_vec_3D, ...
-        M_V_vec_3D, M_gamma0_vec_3D, v_gust, 0, 0);
+        M_V_vec_3D, M_gamma0_vec_3D, v_gust, 0, 0, sigma_RM, sigma_VM);
 
     hit_vec(k)   = logical(data.hit);
     R_hit_vec(k) = data.R_hit;
     t_end_vec(k) = data.t_vec(end);
     t_run_vec{k} = data.t_vec;
+    sigma_RM_vec(:, k) = sigma_RM(:);
+    sigma_VM_vec(:, k) = sigma_VM(:);
+
+    if data.hit
+        impact_time_vec(k) = data.t_vec(end);
+    end
 
     n_k = length(data.t_vec);
     v_gust_ts{k} = data.v_gust(:, 1:n_k);
@@ -91,6 +109,11 @@ for k = 1:N_mc
         r_min_end(i, k) = min(data.r_go{i});
         N_CPN_ts{i, k} = data.N_CPN{i};
         epsilon_ts{i, k} = data.epsilon{i};
+
+        if data.hit
+            gamma_hit = data.gammaM{i}(:, end);
+            hit_angle_vec(i, k, :) = [gamma_hit(3), gamma_hit(2), gamma_hit(1)];
+        end
     end
 
     tau_m_vec(k)  = tau_m_3D;
@@ -116,9 +139,13 @@ results.v_gust_ts    = v_gust_ts;
 results.t_run_vec    = t_run_vec;
 results.r_min_end    = r_min_end;
 results.t_end        = t_end_vec;
+results.impact_time  = impact_time_vec;
+results.hit_angle    = hit_angle_vec;
 results.tau_m        = tau_m_vec;
 results.tau_f        = tau_f_vec;
 results.tau_sk       = tau_sk_vec;
+results.sigma_RM     = sigma_RM_vec;
+results.sigma_VM     = sigma_VM_vec;
 
 results.P_hit        = mean(hit_vec);
 results.hit_probability = results.P_hit;

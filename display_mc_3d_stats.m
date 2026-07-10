@@ -51,6 +51,12 @@ end
 %% R_hit histogram
 plot_R_hit_hist(results.R_hit);
 
+%% Time of impact histogram
+plot_impact_time_hist(results.impact_time, results.N_mc);
+
+%% Hit angle histograms
+plot_hit_angle_histograms(results.hit_angle, results.N_mc);
+
 %% Local helper functions
 function dt = infer_dt(t_run_vec)
     dt = 1;
@@ -173,4 +179,78 @@ function plot_R_hit_hist(R_hit)
     title(sprintf('R_{hit} Distribution (mean = %.4g, std = %.4g)', mu, s));
     xlabel('R_{hit} [m]');
     ylabel('count');
+end
+
+function plot_impact_time_hist(impact_time, n_mc)
+% Histogram of impact times across hit runs.
+
+    impact_time = impact_time(~isnan(impact_time));
+    n_bins = max(5, round(n_mc / 10));
+
+    figure('Name', 'Impact Time Histogram');
+
+    if isempty(impact_time)
+        histogram(nan);
+        title('Impact Time Distribution (no hits)');
+    else
+        histogram(impact_time, n_bins);
+        mu = mean(impact_time);
+        s  = std(impact_time);
+        title(sprintf('Impact Time Distribution (mean = %.4g, std = %.4g)', mu, s));
+    end
+
+    grid on;
+    xlabel('time of impact [s]');
+    ylabel('count');
+end
+
+function plot_hit_angle_histograms(hit_angle, n_mc)
+% Polar histograms of hit angles [psi, theta, phi] for each missile and combined.
+
+    angle_names = {'\psi', '\theta', '\phi'};
+    edges_deg = 0:30:360;
+    m = size(hit_angle, 1);
+
+    for i = 1:m
+        figure('Name', sprintf('Hit Angle Polar Histogram - Missile %d', i));
+
+        for j = 1:3
+            subplot(3, 1, j);
+            x = squeeze(hit_angle(i, :, j));
+            x = rad2deg(x(~isnan(x)));
+            x = wrap_angle_deg(x);
+
+            if isempty(x)
+                polarhistogram('BinEdges', deg2rad(edges_deg), 'BinCounts', zeros(1, numel(edges_deg) - 1));
+                title(sprintf('%s Missile %d (no hits)', angle_names{j}, i));
+            else
+                polarhistogram(deg2rad(x), 'BinEdges', deg2rad(edges_deg));
+                title(sprintf('%s Missile %d (mean = %.4g deg, std = %.4g deg)', ...
+                    angle_names{j}, i, mean(x), std(x)));
+            end
+        end
+    end
+
+    figure('Name', 'Hit Angle Polar Histogram - All Missiles Combined');
+    for j = 1:3
+        subplot(3, 1, j);
+        x = reshape(hit_angle(:, :, j), [], 1);
+        x = rad2deg(x(~isnan(x)));
+        x = wrap_angle_deg(x);
+
+        if isempty(x)
+            polarhistogram('BinEdges', deg2rad(edges_deg), 'BinCounts', zeros(1, numel(edges_deg) - 1));
+            title(sprintf('%s All Missiles (no hits)', angle_names{j}));
+        else
+            polarhistogram(deg2rad(x), 'BinEdges', deg2rad(edges_deg));
+            title(sprintf('%s All Missiles (mean = %.4g deg, std = %.4g deg)', ...
+                angle_names{j}, mean(x), std(x)));
+        end
+    end
+end
+
+function x = wrap_angle_deg(x)
+% Wrap angles in degrees to [0, 360).
+
+    x = mod(x, 360);
 end
