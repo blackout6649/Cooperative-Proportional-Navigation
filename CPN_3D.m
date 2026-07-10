@@ -1,10 +1,10 @@
 %% GUIDANCE AND NAVIGATION - FINAL PROJECT NUMERICAL SIMULATION
 
 %% 3-D GNC simulation function
-function data = CPN_3D(m, N, K_gain, A_max, R_hit, tau_m, tau_f, tau_sk, tend, dt, T_x0, M_x0_vec, M_V_vec, M_gamma0_vec, gvis, save_fig)
-if nargin == 15
+function data = CPN_3D(m, N, K_gain, A_max, R_hit, tau_m, tau_f, tau_sk, tend, dt, T_x0, M_x0_vec, M_V_vec, M_gamma0_vec, v_gust, gvis, save_fig)
+if nargin == 16
     save_fig = 0;
-elseif nargin == 14
+elseif nargin == 15
     save_fig = 0;
     gvis     = 0;
 end
@@ -15,6 +15,12 @@ n_sim = length(t_vec);
 a_max = 9.8 * A_max;
 K = K_gain;
 hit = 0;
+
+if isvector(v_gust)
+    v_gust = repmat(v_gust(:), 1, n_sim);
+elseif size(v_gust, 1) ~= 3 || size(v_gust, 2) ~= n_sim
+    error('v_gust must be 3x1 or 3xn_sim.');
+end
 
 VMtot       = M_V_vec;
 RT          = zeros(3, n_sim); RT(:, 1) = T_x0;
@@ -85,7 +91,7 @@ if t == 1
                                    sin(theta)];
 end
 
-    V_rel{i}(:, t)  = VT(:, t) - VM{i}(:, t);
+    V_rel{i}(:, t)  = VT(:, t) - (VM{i}(:, t) + v_gust(:, t));
     r_go_dot{i}(t)  = dot(r_rel{i}(:, t), V_rel{i}(:, t)) / r_go{i}(t);
     omega{i}(:, t)  = cross(r_rel{i}(:, t), V_rel{i}(:, t)) / r_go{i}(t);
 
@@ -129,14 +135,14 @@ for i = 1:m
     a_ideal{i}(:, t) = sign(a) .* min(abs(a), a_max);
     if tau_m > 0 && t < n_sim
         a_com{i}(:, t+1)  = a_com{i}(:, t) + (a_ideal{i}(:, t) - a_com{i}(:, t));
-    elseif tau_f == 0
+    elseif tau_m == 0
         a_com{i}(:, t)    = a_ideal{i}(:, t);
     end
     
     w_com{i}(:, t) = -cross(VM{i}(:, t), a_com{i}(:, t)) / (VMtot{i}^2);
 
     if t < n_sim
-    RM{i}(:, t+1)   = RM{i}(:, t) + dt .* VM{i}(:, t);
+    RM{i}(:, t+1)   = RM{i}(:, t) + dt .* (VM{i}(:, t) + v_gust(:, t));
     RT(:, t+1)      = RT(:, t);
     
     gammaM{i}(:, t+1)  = gammaM{i}(:, t) + dt .* w_com{i}(:, t);
@@ -290,6 +296,7 @@ data.m           = m         ;
 data.N           = N         ;
 data.A_max       = A_max     ;
 data.VMtot       = VMtot     ;
+data.v_gust      = v_gust    ;
 
 
 end
@@ -315,6 +322,9 @@ end
                         
     % M_gamma0_vec  - missile initial headings; mx1 cell; in [deg]
                         % M_gamma0_vec{i} = [phi0, theta0, psi0] for missile i
+
+    % v_gust        - wind gust velocity profile [m/sec]
+                        % either 3x1 (constant gust) or 3xn_sim (time-varying)
 
     % gvis          - show graph of missile paths, 1 = show, 0 = no show
     % save_fig      - save graph of missile paths, 1 = save, 0 = no save
@@ -347,3 +357,4 @@ end
     % data.N           - parallel navigation constant
     % data.A_max       - max acceleration allowed for missiles, in [G]
     % data.VMtot       - missile total velocities, in [m/sec]
+    % data.v_gust      - gust profile used in the simulation, in [m/sec]
