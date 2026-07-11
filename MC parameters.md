@@ -11,7 +11,7 @@ dt_3D = 0.001 [sec]
 
 ## RANDOM INPUTS PER SCENARIO
 
-tau_m = U(0.005, 0.05)            # mechanical lag time constant [sec]
+tau_m = U(0.3, 1.0)            # mechanical lag time constant [sec]
 tau_f = U(0.01, 0.1)              # filter lag time constant [sec]
 tau_sk = U(0.01, 0.2)             # seeker lag time constant [sec]
 

@@ -20,16 +20,20 @@ dt = infer_dt(results.t_run_vec);
 n_max = max_length(results.t_run_vec);
 t_grid = (0:n_max-1) * dt;
 
-%% N_CPN vs time (per missile)
+%% N_CPN vs time (per missile - subplots)
+figure('Name', 'N_{CPN} - Per Missile');
 for i = 1:m
+    subplot(m, 1, i);
     X = stack_cell_row(results.N_CPN_ts, i, n_max);
-    plot_time_stats(t_grid, X, sprintf('N_{CPN} - Missile %d', i), 'N_{CPN}');
+    plot_time_stats_ax(gca, t_grid, X, sprintf('N_{CPN} - Missile %d', i), 'N_{CPN}');
 end
 
-%% epsilon vs time (per missile)
+%% epsilon vs time (per missile - subplots)
+figure('Name', '\epsilon - Per Missile');
 for i = 1:m
+    subplot(m, 1, i);
     X = stack_cell_row(results.epsilon_ts, i, n_max);
-    plot_time_stats(t_grid, X, sprintf('\\epsilon - Missile %d', i), '\epsilon [sec]');
+    plot_time_stats_ax(gca, t_grid, X, sprintf('\\epsilon - Missile %d', i), '\epsilon [sec]');
 end
 
 %% N_CPN vs time (all missiles combined)
@@ -67,6 +71,9 @@ plot_hit_spread_hist(results, m);
 
 %% Hit angle histograms
 plot_hit_angle_histograms(results.hit_angle, results.N_mc);
+
+%% Save all figures (optional, via pop-up)
+save_all_figures_prompt();
 
 %% Local helper functions
 function dt = infer_dt(t_run_vec)
@@ -176,6 +183,65 @@ function plot_time_stats(t, X, ttl, ylab, show_three_sigma, accel_limit)
     ylabel(ylab);
     legend('Location', 'best');
     hold off;
+end
+
+function plot_time_stats_ax(ax, t, X, ttl, ylab, show_three_sigma, accel_limit)
+% Same as plot_time_stats but draws into a given axes handle (for subplots).
+
+    if nargin < 6
+        show_three_sigma = true;
+    end
+    if nargin < 7
+        accel_limit = [];
+    end
+
+    mu    = mean(X, 1, 'omitnan');
+    s     = std(X, 0, 1, 'omitnan');
+    x_min = min(X, [], 1, 'omitnan');
+    x_max = max(X, [], 1, 'omitnan');
+
+    valid = any(~isnan(X), 1);
+    t = t(valid);
+    mu = mu(valid); s = s(valid);
+    x_min = x_min(valid); x_max = x_max(valid);
+
+    hold(ax, 'on'); grid(ax, 'on');
+
+    % min/max envelope
+    fill_between_ax(ax, t, x_min, x_max, [0.90 0.90 0.90], 'min/max');
+
+    if show_three_sigma
+        fill_between_ax(ax, t, mu - 3*s, mu + 3*s, [0.75 0.83 0.95], '\pm 3\sigma');
+    end
+
+    fill_between_ax(ax, t, mu - s, mu + s, [0.55 0.70 0.90], '\pm 1\sigma');
+
+    if ~isempty(accel_limit) && isfinite(accel_limit)
+        yline(ax, accel_limit, 'r--', 'LineWidth', 1.4, 'DisplayName', '+a_{max}');
+        yline(ax, -accel_limit, 'r--', 'LineWidth', 1.4, 'DisplayName', '-a_{max}');
+    end
+
+    plot(ax, t, mu, 'k-', 'LineWidth', 1.8, 'DisplayName', 'mean');
+
+    title(ax, ttl);
+    xlabel(ax, 't [s]');
+    ylabel(ax, ylab);
+    legend(ax, 'Location', 'best');
+    hold(ax, 'off');
+end
+
+function fill_between_ax(ax, t, y_lo, y_hi, rgb, name)
+% Shaded band into a specific axes handle.
+
+    t = t(:).';
+    y_lo = y_lo(:).';
+    y_hi = y_hi(:).';
+
+    xx = [t, fliplr(t)];
+    yy = [y_lo, fliplr(y_hi)];
+
+    fill(ax, xx, yy, rgb, 'EdgeColor', 'none', 'FaceAlpha', 0.6, ...
+        'DisplayName', name);
 end
 
 function fill_between(t, y_lo, y_hi, rgb, name)
@@ -373,4 +439,40 @@ function x = wrap_angle_deg(x)
 % Wrap angles in degrees to [0, 360).
 
     x = mod(x, 360);
+end
+
+function save_all_figures_prompt()
+% Pop-up dialog asking whether to save all open figures, and if yes, where.
+
+    answer = questdlg('Save all figures to disk?', 'Save Figures', 'Yes', 'No', 'No');
+    if ~strcmp(answer, 'Yes')
+        return;
+    end
+
+    save_dir = uigetdir(pwd, 'Select folder to save figures');
+    if isequal(save_dir, 0)
+        return;  % user cancelled
+    end
+
+    figs = findall(0, 'Type', 'figure');
+    if isempty(figs)
+        msgbox('No figures to save.', 'Info');
+        return;
+    end
+
+    for i = 1:numel(figs)
+        fig = figs(i);
+        fig_name = get(fig, 'Name');
+        if isempty(fig_name)
+            fig_name = sprintf('figure_%d', fig.Number);
+        end
+        % sanitize filename
+        fig_name = regexprep(fig_name, '[\\/:*?"<>|]', '_');
+
+        % save as .fig and .png
+        savefig(fig, fullfile(save_dir, [fig_name '.fig']));
+        exportgraphics(fig, fullfile(save_dir, [fig_name '.png']), 'Resolution', 200);
+    end
+
+    msgbox(sprintf('Saved %d figures to:\n%s', numel(figs), save_dir), 'Done');
 end

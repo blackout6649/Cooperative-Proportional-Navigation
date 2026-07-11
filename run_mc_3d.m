@@ -69,7 +69,7 @@ wb = waitbar(0, 'Running Monte Carlo simulation...');
 for k = 1:N_mc
 
     % Random inputs from MC parameters.md
-    tau_m_3D = sample_uniform(0.005, 0.05);
+    tau_m_3D = sample_uniform(0.3, 1);
     tau_f_3D = sample_uniform(0.01, 0.1);
 
     tau_sk_3D = sample_uniform(0.01, 0.2);
