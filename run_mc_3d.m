@@ -54,6 +54,11 @@ tau_m_vec       = zeros(1, N_mc);
 tau_f_vec       = zeros(1, N_mc);
 tau_sk_vec      = zeros(1, N_mc);
 impact_time_vec = nan(1, N_mc);
+t_hit_mat       = nan(m_3D, N_mc);
+hit_flags_mat   = false(m_3D, N_mc);
+t_hit_first_vec = nan(1, N_mc);
+t_hit_last_vec  = nan(1, N_mc);
+t_hit_spread_vec = nan(1, N_mc);
 hit_angle_vec   = nan(m_3D, N_mc, 3);
 sigma_RM_vec    = zeros(3, N_mc);
 sigma_VM_vec    = zeros(3, N_mc);
@@ -73,13 +78,13 @@ for k = 1:N_mc
     M_V_vec_3D      = cell([m_3D 1]);
     M_gamma0_vec_3D = cell([m_3D 1]);
 
-    % initial positions: sample each missile an annulus (R_min <= r <= R_init) on the x-y plane (z = 0) so they start at least R_min from the target.
-    R_init_3D = 3000;
+    % initial positions: sample each missile an annulus (R_min <= r <= R_max) on the x-y plane (z = 0) so they start at least R_min from the target.
+    R_max_3D = 3000;
     R_min_3D  = 2000;
 
     for i = 1:m_3D
         ang0              = 2 * pi * (i - 1 + rand);
-        r0                = sqrt(R_min_3D^2 + rand * (R_init_3D^2 - R_min_3D^2));
+        r0                = sqrt(R_min_3D^2 + rand * (R_max_3D^2 - R_min_3D^2));
         M_x0_vec_3D{i}     = [r0 * cos(ang0), r0 * sin(ang0), 0];
         M_V_vec_3D{i}      = sample_uniform(100, 150);
         % heading [phi, theta, psi]: elevation theta ~ 90 deg (straight up) +-10 deg
@@ -116,6 +121,22 @@ for k = 1:N_mc
 
     if run_success
         impact_time_vec(k) = data.t_vec(end);
+    end
+
+    if isfield(data, 'hit_flags')
+        hit_flags_mat(:, k) = logical(data.hit_flags(:));
+    end
+
+    if isfield(data, 't_hit')
+        t_hit_k = data.t_hit(:);
+        t_hit_mat(:, k) = t_hit_k;
+
+        valid_hit_k = ~isnan(t_hit_k);
+        if any(valid_hit_k)
+            t_hit_first_vec(k) = min(t_hit_k(valid_hit_k));
+            t_hit_last_vec(k) = max(t_hit_k(valid_hit_k));
+            t_hit_spread_vec(k) = t_hit_last_vec(k) - t_hit_first_vec(k);
+        end
     end
 
     n_k = length(data.t_vec);
@@ -173,6 +194,11 @@ results.t_run_vec    = t_run_vec;
 results.r_min_end    = r_min_end;
 results.t_end        = t_end_vec;
 results.impact_time  = impact_time_vec;
+results.t_hit        = t_hit_mat;
+results.hit_flags_missile = hit_flags_mat;
+results.t_hit_first  = t_hit_first_vec;
+results.t_hit_last   = t_hit_last_vec;
+results.t_hit_spread = t_hit_spread_vec;
 results.hit_angle    = hit_angle_vec;
 results.tau_m        = tau_m_vec;
 results.tau_f        = tau_f_vec;

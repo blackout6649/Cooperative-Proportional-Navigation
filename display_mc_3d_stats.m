@@ -62,6 +62,9 @@ plot_miss_distance_hist(results.miss_distance_min);
 %% Time of impact histogram
 plot_impact_time_hist(results.impact_time, results.N_mc);
 
+%% First-vs-last missile hit-time difference histogram
+plot_hit_spread_hist(results, m);
+
 %% Hit angle histograms
 plot_hit_angle_histograms(results.hit_angle, results.N_mc);
 
@@ -283,6 +286,42 @@ function plot_impact_time_hist(impact_time, n_mc)
     grid on;
     xlabel('time of impact [s]');
     ylabel('count');
+end
+
+function plot_hit_spread_hist(results, m)
+% Histogram of per-scenario hit-time spread: last missile hit minus first missile hit.
+
+    if ~isfield(results, 't_hit')
+        warning(['Cannot plot first-last hit-time histogram: results.t_hit is missing. ', ...
+                 'Need per-missile hit times as an m x N_mc matrix in results.t_hit.']);
+        return;
+    end
+
+    t_hit = results.t_hit;
+    if ~ismatrix(t_hit) || size(t_hit, 1) ~= m
+        warning('Cannot plot first-last hit-time histogram: results.t_hit must be m x N_mc.');
+        return;
+    end
+
+    all_hit_runs = all(~isnan(t_hit), 1);
+    spread = max(t_hit(:, all_hit_runs), [], 1) - min(t_hit(:, all_hit_runs), [], 1);
+    n_bins = max(5, round(results.N_mc / 10));
+
+    figure('Name', 'First-to-Last Hit Time Difference Histogram');
+
+    if isempty(spread)
+        histogram(nan);
+        title('First-to-Last Hit Time Difference (no all-hit runs)');
+    else
+        histogram(spread, n_bins);
+        mu = mean(spread);
+        s  = std(spread);
+        title(sprintf('First-to-Last Hit Time Difference (mean = %.4g, std = %.4g)', mu, s));
+    end
+
+    grid on;
+    xlabel('\Delta t_{hit} = t_{last} - t_{first} [s]');
+    ylabel('count of scenarios');
 end
 
 function plot_hit_angle_histograms(hit_angle, n_mc)

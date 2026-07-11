@@ -1,2 +1,5 @@
 *.mat
 *.asv
+figs3000/
+figsSingleRuns/
+pngs/
