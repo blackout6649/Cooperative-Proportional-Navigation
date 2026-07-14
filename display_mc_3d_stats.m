@@ -318,9 +318,13 @@ function plot_miss_distance_hist(miss_distance_min)
 % Histogram of closest-approach miss distance across all MC runs.
 
     miss_distance_min = miss_distance_min(:);
+    miss_distance_min = miss_distance_min(~isnan(miss_distance_min) & miss_distance_min <= 100);
+
+    focus_limit = 20;
+    hist_data = miss_distance_min(miss_distance_min <= focus_limit);
 
     figure('Name', 'Miss Distance Histogram');
-    histogram(miss_distance_min);
+    histogram(hist_data, 10);
     grid on;
 
     mu = mean(miss_distance_min);
@@ -329,6 +333,12 @@ function plot_miss_distance_hist(miss_distance_min)
     title(sprintf('Miss Distance Distribution (mean = %.4g, std = %.4g)', mu, s));
     xlabel('miss\_distance\_min [m]');
     ylabel('count');
+
+    if isempty(miss_distance_min)
+        xlim([0 1]);
+    else
+        xlim([0 focus_limit]);
+    end
 end
 
 function plot_impact_time_hist(impact_time, n_mc)
