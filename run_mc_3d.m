@@ -22,6 +22,19 @@ n_sim           = length(t_vec);
 
 T_x0_3D         = [0, 0, 0];
 
+%% VISUALIZATION OPTIONS
+% Set to true to enable real-time 3D trajectory animation (only works with N_mc = 1)
+plot_realtime   = false;
+% Playback speed: 1 = real-time, 0.5 = half-speed, 2 = double-speed
+rt_playback_speed = 1;
+% Save animation to video file (only if plot_realtime = true)
+rt_save_video   = false;
+% Video output frame rate in fps (lower = smaller file). Default: 15 fps
+% For 30 sec video: 15 fps = 450 frames, 10 fps = 300 frames, 5 fps = 150 frames
+rt_video_fps    = 15;
+% Video quality/resolution: 'low' (720p), 'medium' (1080p), 'high' (1440p)
+rt_video_quality = 'medium';
+
 % Gauss-Markov gust parameter ranges for MC sampling.
 % sigma_gust is the steady-state gust std [m/s] in x,y,z.
 % L_gust is the turbulence length scale [m] in x,y,z.
@@ -176,7 +189,16 @@ end
 
 % for a single run, show the 3D trajectory of that run
 if N_mc == 1
-    plot_trajectory_3d(data);
+    if plot_realtime
+        % Real-time animation
+        fprintf('\n========================================\n');
+        fprintf('Plotting REAL-TIME 3D Trajectory Animation\n');
+        fprintf('========================================\n');
+        plot_trajectory_3d_realtime(data, rt_playback_speed, rt_save_video, rt_video_fps, rt_video_quality);
+    else
+        % Static 3D plot
+        plot_trajectory_3d(data);
+    end
 end
 
 %% Aggregate MC results
