@@ -85,34 +85,42 @@ end
 %%  main simulation loop
 for t = 1:n_sim
 
+% calculating the current state for each missile
 for i = 1:m
-    phi     = gammaM{i}(1, t); % roll
-    theta   = gammaM{i}(2, t); % pitch
-    psi     = gammaM{i}(3, t); % yaw
 
     RM_meas         = RM{i}(:, t) + sigma_RM .* randn(3, 1);
     r_rel{i}(:, t)  = RT(:, t) - RM_meas;
     r_go{i}(t)      = max(sqrt(sum(r_rel{i}(:, t) .^ 2)), eps);
 if t == 1
+    phi     = gammaM{i}(1, t); % roll, irrelevant for this navigation model
+    theta   = gammaM{i}(2, t); % pitch
+    psi     = gammaM{i}(3, t); % yaw
+
     VM{i}(:, t)     = VMtot{i} .* [cos(theta)*cos(psi),...
                                    cos(theta)*sin(psi),...
                                    sin(theta)];
+else
+    theta           = asin(VM{i}(3, t) / VMtot{i})                  ;
+    psi             = asin(VM{i}(2, t) / (VMtot{i} * cos(theta)))   ;
+
+    gammaM{i}(2, t) = theta ;
+    gammaM{i}(3, t) = psi   ;
 end
 
     VM_meas         = VM{i}(:, t) + sigma_VM .* randn(3, 1);
 
     V_rel{i}(:, t)  = VT(:, t) - (VM_meas + v_gust(:, t));
     r_go_dot{i}(t)  = dot(r_rel{i}(:, t), V_rel{i}(:, t)) / r_go{i}(t);
-    omega{i}(:, t)  = cross(r_rel{i}(:, t), V_rel{i}(:, t)) / r_go{i}(t);
+    omega{i}(:, t)  = cross(r_rel{i}(:, t), V_rel{i}(:, t)) / r_go{i}(t)^2;
 
     if tau_sk > 0 && t < n_sim
-        omega_m{i}(:, t+1)  = omega_m{i}(:, t) + (omega{i}(:, t) - omega_m{i}(:, t));
+        omega_m{i}(:, t+1)  = omega_m{i}(:, t) + (omega{i}(:, t) - omega_m{i}(:, t)) .* dt/tau_sk;
     elseif tau_sk == 0
         omega_m{i}(:, t)    = omega{i}(:, t);
     end
 
     if tau_f > 0 && t < n_sim
-        omega_f{i}(:, t+1)  = omega_f{i}(:, t) + (omega_m{i}(:, t) - omega_f{i}(:, t));
+        omega_f{i}(:, t+1)  = omega_f{i}(:, t) + (omega_m{i}(:, t) - omega_f{i}(:, t)) .* dt/tau_f;
     elseif tau_f == 0
         omega_f{i}(:, t)    = omega_m{i}(:, t);
     end
@@ -144,26 +152,27 @@ for i = 1:m
     N_CPN{i}(t) = N * (1 - K * r_go{i}(t) * epsilon{i}(t));
 
     a_uncapped{i}(:, t) = N_CPN{i}(t) .* cross(omega_f{i}(:, t), VM{i}(:, t));
-    a_ideal{i}(:, t) = sign(a_uncapped{i}(:, t)) .* min(abs(a_uncapped{i}(:, t)), a_max);
+    a = sqrt(sum(a_uncapped{i}(:, t) .^ 2));
+    if a > a_max
+        a_ideal{i}(:, t) = a_uncapped{i}(:, t) .* a_max/a;
+    else
+        a_ideal{i}(:, t) = a_uncapped{i}(:, t);
+    end
     if tau_m > 0 && t < n_sim
-        a_com{i}(:, t+1)  = a_com{i}(:, t) + (a_ideal{i}(:, t) - a_com{i}(:, t));
+        a_com{i}(:, t+1)  = a_com{i}(:, t) + (a_ideal{i}(:, t) - a_com{i}(:, t)) .* dt/tau_m;
     elseif tau_m == 0
         a_com{i}(:, t)    = a_ideal{i}(:, t);
     end
     
-    w_com{i}(:, t) = -cross(VM{i}(:, t), a_com{i}(:, t)) / (VMtot{i}^2);
-
     if t < n_sim
         % propagate the missile state, or hold it frozen after it has hit
         if hit_flags(i)
-            RM{i}(:, t+1)      = RM{i}(:, t);
-            gammaM{i}(:, t+1)  = gammaM{i}(:, t);
-            VM{i}(:, t+1)      = VM{i}(:, t);
+            RM{i}(:, t+1)   = RM{i}(:, t);
+            VM{i}(:, t+1)   = VM{i}(:, t);
         else
-            RM{i}(:, t+1)      = RM{i}(:, t) + dt .* (VM{i}(:, t) + v_gust(:, t));
-            gammaM{i}(:, t+1)  = gammaM{i}(:, t) + dt .* w_com{i}(:, t);
-            V = (VM{i}(:, t) + a_com{i}(:, t) .* dt);
-            VM{i}(:, t+1)      = V .* VMtot{i}/sqrt(sum(V.^2));
+            RM{i}(:, t+1)   = RM{i}(:, t) + dt .* (VM{i}(:, t) + v_gust(:, t));
+            V               = VM{i}(:, t) + a_com{i}(:, t) .* dt;
+            VM{i}(:, t+1)   = V .* VMtot{i}/sqrt(sum(V.^2));
         end
     end
 
