@@ -13,9 +13,9 @@ m_3D            = 3;
 N_3D            = 3;
 K_gain_3D       = 40;
 A_max_3D        = 35;
-R_hit_3D        = 1;
+R_hit_3D        = 10;
 
-tend_3D         = 30;
+tend_3D         = 40;
 dt_3D           = 0.001;
 t_vec           = 0:dt_3D:tend_3D;
 n_sim           = length(t_vec);
@@ -72,7 +72,7 @@ hit_flags_mat   = false(m_3D, N_mc);
 t_hit_first_vec = nan(1, N_mc);
 t_hit_last_vec  = nan(1, N_mc);
 t_hit_spread_vec = nan(1, N_mc);
-hit_angle_vec   = nan(m_3D, N_mc, 3);
+hit_angle_vec   = nan(m_3D, N_mc, 2);
 sigma_RM_vec    = zeros(3, N_mc);
 sigma_VM_vec    = zeros(3, N_mc);
 
@@ -100,10 +100,9 @@ for k = 1:N_mc
         r0                = sqrt(R_min_3D^2 + rand * (R_max_3D^2 - R_min_3D^2));
         M_x0_vec_3D{i}     = [r0 * cos(ang0), r0 * sin(ang0), 0];
         M_V_vec_3D{i}      = sample_uniform(100, 150);
-        % heading [phi, theta, psi]: elevation theta ~ 90 deg (straight up) +-10 deg
-        M_gamma0_vec_3D{i} = [sample_uniform(60, 120), ...
-                              sample_uniform(80, 100), ...
-                              sample_uniform(60, 120)];
+        % heading [theta, psi]: elevation theta ~ 90 deg (straight up) +-10 deg
+        M_gamma0_vec_3D{i} = [sample_uniform(80, 100), ...
+                      sample_uniform(60, 120)];
     end
 
     % Additional random input: gust realization for this run.
@@ -170,7 +169,7 @@ for k = 1:N_mc
 
         if run_success
             gamma_hit = data.gammaM{i}(:, end);
-            hit_angle_vec(i, k, :) = [gamma_hit(3), gamma_hit(2), gamma_hit(1)];
+            hit_angle_vec(i, k, :) = [gamma_hit(2), gamma_hit(1)];
         end
     end
 

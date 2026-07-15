@@ -53,7 +53,7 @@ VT          = zeros(3, n_sim);
 
 
 for i = 1:m
-    gammaM{i}       = zeros(3, n_sim);
+    gammaM{i}       = zeros(2, n_sim);
     gammaM{i}(:, 1) = deg2rad(M_gamma0_vec{i});
     
     RM{i}           = zeros(3, n_sim);
@@ -92,9 +92,8 @@ for i = 1:m
     r_rel{i}(:, t)  = RT(:, t) - RM_meas;
     r_go{i}(t)      = max(sqrt(sum(r_rel{i}(:, t) .^ 2)), eps);
 if t == 1
-    phi     = gammaM{i}(1, t); % roll, irrelevant for this navigation model
-    theta   = gammaM{i}(2, t); % pitch
-    psi     = gammaM{i}(3, t); % yaw
+    theta   = gammaM{i}(1, t); % elevation
+    psi     = gammaM{i}(2, t); % yaw
 
     VM{i}(:, t)     = VMtot{i} .* [cos(theta)*cos(psi),...
                                    cos(theta)*sin(psi),...
@@ -103,8 +102,8 @@ else
     theta           = asin(VM{i}(3, t) / VMtot{i})                  ;
     psi             = asin(VM{i}(2, t) / (VMtot{i} * cos(theta)))   ;
 
-    gammaM{i}(2, t) = theta ;
-    gammaM{i}(3, t) = psi   ;
+    gammaM{i}(1, t) = theta ;
+    gammaM{i}(2, t) = psi   ;
 end
 
     VM_meas         = VM{i}(:, t) + sigma_VM .* randn(3, 1);
@@ -299,7 +298,7 @@ end
                         % M_V_vec{i} = V_tot for missile i
                         
     % M_gamma0_vec  - missile initial headings; mx1 cell; in [deg]
-                        % M_gamma0_vec{i} = [phi0, theta0, psi0] for missile i
+                        % M_gamma0_vec{i} = [theta0, psi0] for missile i
 
     % v_gust        - wind gust velocity profile [m/sec]
                         % either 3x1 (constant gust) or 3xn_sim (time-varying)
@@ -315,7 +314,7 @@ end
     % data.RT          - target location over time, in [m]
     % data.r_rel       - target location relative to missile over time, in [m]
     % data.RM          - missiles' location over time, in [m]
-    % data.gammaM      - missiles' heading angles over time [phi; theta; psi], in [rad]
+    % data.gammaM      - missiles' heading angles over time [theta; psi], in [rad]
     % data.VM          - missiles' velocity over time, in [m/sec]
     % data.V_rel       - target velocity relative to missile over time, in [m]
     % data.omega       - ideal LOS rate of change over time, in [rad/sec]

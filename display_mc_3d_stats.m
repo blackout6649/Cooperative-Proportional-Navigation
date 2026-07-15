@@ -69,8 +69,8 @@ plot_impact_time_hist(results.impact_time, results.N_mc);
 %% First-vs-last missile hit-time difference histogram
 plot_hit_spread_hist(results, m);
 
-%% Hit angle histograms
-plot_hit_angle_histograms(results.hit_angle, results.N_mc);
+%% Hit angle histograms (psi/theta only)
+plot_hit_angle_histograms(results.hit_angle);
 
 %% Save all figures (optional, via pop-up)
 save_all_figures_prompt();
@@ -400,18 +400,18 @@ function plot_hit_spread_hist(results, m)
     ylabel('count of scenarios');
 end
 
-function plot_hit_angle_histograms(hit_angle, n_mc)
-% Polar histograms of hit angles [psi, theta, phi] for each missile and combined.
+function plot_hit_angle_histograms(hit_angle)
+% Polar histograms of hit angles [psi, theta] for each missile and combined.
 
-    angle_names = {'\psi', '\theta', '\phi'};
+    angle_names = {'\psi', '\theta'};
     edges_deg = 0:30:360;
     m = size(hit_angle, 1);
 
     for i = 1:m
         figure('Name', sprintf('Hit Angle Polar Histogram - Missile %d', i));
 
-        for j = 1:3
-            subplot(3, 1, j);
+        for j = 1:2
+            subplot(2, 1, j);
             x = squeeze(hit_angle(i, :, j));
             x = rad2deg(x(~isnan(x)));
             x = wrap_angle_deg(x);
@@ -428,8 +428,8 @@ function plot_hit_angle_histograms(hit_angle, n_mc)
     end
 
     figure('Name', 'Hit Angle Polar Histogram - All Missiles Combined');
-    for j = 1:3
-        subplot(3, 1, j);
+    for j = 1:2
+        subplot(2, 1, j);
         x = reshape(hit_angle(:, :, j), [], 1);
         x = rad2deg(x(~isnan(x)));
         x = wrap_angle_deg(x);

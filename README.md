@@ -67,7 +67,7 @@ plot_trajectory_3d(data)
 Each scenario randomly samples:
 - Mechanical, filter, and seeker lag time constants
 - Missile initial positions (annulus around target)
-- Missile speeds and heading angles
+- Missile speeds and 3D heading angles, stored as elevation theta and yaw psi only
 - Wind gust parameters (Gauss–Markov model)
 - Position and velocity measurement noise
 

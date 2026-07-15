@@ -23,8 +23,7 @@ R_init_3D = 3000
 
 M_V_vec_3D{i} = U(100, 150)       # missile speed [m/sec]
 
-M_gamma0_vec_3D{i} = [phi0, theta0, psi0]            # initial heading [deg]
-phi0 = U(60, 120)
+M_gamma0_vec_3D{i} = [theta0, psi0]                  # initial heading [deg]
 theta0 = U(80, 100)               # elevation around 90 deg (+/-10 deg)
 psi0 = U(60, 120)
 
@@ -69,7 +68,7 @@ t_hit_first               # 1 x N_mc, first missile hit time per scenario [sec]
 t_hit_last                # 1 x N_mc, last missile hit time per scenario [sec]
 t_hit_spread              # 1 x N_mc, t_hit_last - t_hit_first per scenario [sec]
 
-hit_angle                 # m x N_mc x 3, final [psi, theta, phi] on all-hit scenarios [rad]
+hit_angle                 # m x N_mc x 2, final [psi, theta] on all-hit scenarios [rad]
 
 tau_m, tau_f, tau_sk      # 1 x N_mc, sampled lag constants
 sigma_RM, sigma_VM        # 3 x N_mc, sampled measurement-noise std per axis

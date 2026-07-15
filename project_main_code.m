@@ -44,6 +44,8 @@ tau_m_3D        = 0;
 tau_f_3D        = 0;
 tau_sk_3D       = 0;
 v_gust          = [100; 50; 20];
+sigma_RM_3D     = 0;
+sigma_VM_3D     = 0;
 
 tend_3D         = 30;
 dt_3D           = 0.001;
@@ -59,9 +61,9 @@ M_gamma0_vec_3D = cell([m_3D 1]);
     for i = 1:m_3D
         M_x0_vec_3D{i}     = -500 + 1000 .* [rand, rand, rand];
         M_V_vec_3D{i}      = 100 + 50 * rand;
-        M_gamma0_vec_3D{i} = 60 + 60 * [rand, rand, rand];
+        M_gamma0_vec_3D{i} = 60 + 60 * [rand, rand];
     end
 
 data_3D_test = CPN_3D(m_3D, N_3D, K_gain_3D, A_max_3D, R_hit_3D, tau_m_3D, ...
     tau_f_3D, tau_sk_3D, tend_3D, dt_3D, T_x0_3D, M_x0_vec_3D, M_V_vec_3D, ...
-    M_gamma0_vec_3D, v_gust, gvis_3D, save_fig_3D);
+    M_gamma0_vec_3D, v_gust, sigma_RM_3D, sigma_VM_3D);
