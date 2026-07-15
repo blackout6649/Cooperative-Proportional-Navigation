@@ -93,7 +93,7 @@ for i = 1:m
     r_go{i}(t)      = max(sqrt(sum(r_rel{i}(:, t) .^ 2)), eps);
 if t == 1
     theta   = gammaM{i}(1, t); % elevation
-    psi     = gammaM{i}(2, t); % yaw
+    psi     = gammaM{i}(2, t); % azimuth
 
     VM{i}(:, t)     = VMtot{i} .* [cos(theta)*cos(psi),...
                                    cos(theta)*sin(psi),...
