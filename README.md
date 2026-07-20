@@ -12,6 +12,7 @@ Margarita Birchanski
 
 This project simulates a **cooperative proportional navigation (CPN)** guidance law for multiple missiles engaging a stationary target in 3D space. A Monte Carlo (MC) framework evaluates robustness under randomized initial conditions, wind gusts, measurement noise, and system lags.
 
+![CPN 3D Trajectory Animation](cpn_trajectory.gif)
 
 ## File Structure
 
@@ -97,3 +98,7 @@ This approach eliminates artificial clustering at R_hit and captures realistic m
 
 - MATLAB (R2020b or later recommended for `exportgraphics`)
 - No external toolboxes required
+
+## References
+
+[1] Jeon, In-Soo, Lee, Jin-Ik, and Tahk, Min-Jea, "Homing guidance law for cooperative attack of multiple missiles," *Journal of Guidance, Control, and Dynamics*, vol. 33, no. 1, pp. 275–280, 2010. https://doi.org/10.2514/1.40136
