@@ -175,10 +175,15 @@ for i = 1:m
         end
     end
 
-    % per-missile hit detection: freeze this missile once it hits
+    % per-missile hit detection: freeze this missile once it reaches minimum distance
     if ~hit_flags(i)
-        r_go_true_i = sqrt(sum((RT(:, t) - RM{i}(:, t)) .^ 2));
-        if r_go_true_i <= R_hit
+        r_rel_true = RT(:, t) - RM{i}(:, t);
+        r_go_true_i = sqrt(sum(r_rel_true .^ 2));
+        % Compute true closing velocity (based on true states, not measurements)
+        r_go_dot_true_i = dot(r_rel_true, -VM{i}(:, t)) / r_go_true_i;
+        % Once missile enters R_hit radius, check if it's moving away (r_go_dot_true > 0)
+        if r_go_true_i <= R_hit && r_go_dot_true_i > 0
+            % Missile has reached minimum distance within R_hit
             hit_flags(i) = true;
             t_hit(i)     = t;
             if t < n_sim

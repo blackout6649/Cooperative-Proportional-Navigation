@@ -58,9 +58,9 @@ plot_trajectory_3d(data)
 - **Navigation constant**: N = 3
 - **Cooperative gain**: K = 40
 - **Acceleration limit**: 35 g
-- **Hit radius**: 1 m
+- **Hit detection radius**: 10 m (gating threshold; propagation stops at closest approach within this radius)
 - **Time step**: 1 ms
-- **Max simulation time**: 30 s
+- **Max simulation time**: 40 s
 
 ## Monte Carlo Randomization
 
@@ -73,10 +73,21 @@ Each scenario randomly samples:
 
 See `MC parameters.md` for full ranges.
 
+## Hit Detection Logic
+
+Rather than freezing missiles when they reach a fixed R_hit radius, the simulation captures **true minimum distance**:
+
+1. Missiles propagate freely until entering the R_hit detection zone (10 m)
+2. Once inside R_hit, the simulation computes true closing velocity from unnoisy states
+3. When closing velocity becomes positive (missile moving away), propagation stops
+4. Miss distance is recorded as the closest approach distance
+
+This approach eliminates artificial clustering at R_hit and captures realistic miss distances including scenarios where missiles miss entirely.
+
 ## Key Outputs
 
 - Hit probability (all missiles must hit)
-- Miss distance distribution
+- Miss distance distribution (across all scenarios, including misses beyond R_hit)
 - Impact time and first-to-last hit spread
 - Time-varying N_CPN, epsilon, acceleration commands
 - Hit angle distributions (polar histograms)

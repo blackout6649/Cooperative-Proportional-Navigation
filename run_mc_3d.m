@@ -102,7 +102,7 @@ for k = 1:N_mc
         M_V_vec_3D{i}      = sample_uniform(100, 150);
         % heading [theta, psi]: elevation theta ~ 90 deg (straight up) +-10 deg
         M_gamma0_vec_3D{i} = [sample_uniform(80, 100), ...
-                      sample_uniform(60, 120)];
+                      sample_uniform(0, 180)];
     end
 
     % Additional random input: gust realization for this run.
@@ -198,6 +198,9 @@ if N_mc == 1
         % Static 3D plot
         plot_trajectory_3d(data);
     end
+
+    % Single-run acceleration components in g's (x, y, z)
+    plot_acceleration_3d_single_run(data);
 end
 
 %% Aggregate MC results

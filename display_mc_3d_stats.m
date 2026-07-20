@@ -320,8 +320,8 @@ function plot_miss_distance_hist(miss_distance_min)
     miss_distance_min = miss_distance_min(:);
     miss_distance_min = miss_distance_min(~isnan(miss_distance_min) & miss_distance_min <= 100);
 
-    focus_limit = 20;
-    hist_data = miss_distance_min(miss_distance_min <= focus_limit);
+    % Plot all scenarios, not just those within focus_limit
+    hist_data = miss_distance_min;
 
     figure('Name', 'Miss Distance Histogram');
     histogram(hist_data, 10);
@@ -337,7 +337,7 @@ function plot_miss_distance_hist(miss_distance_min)
     if isempty(miss_distance_min)
         xlim([0 1]);
     else
-        xlim([0 focus_limit]);
+        xlim([0 max(miss_distance_min)]);
     end
 end
 
